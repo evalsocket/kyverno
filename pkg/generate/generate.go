@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"encoding/json"
 
 	"github.com/golang/glog"
 	kyverno "github.com/nirmata/kyverno/pkg/api/kyverno/v1"
@@ -249,13 +250,35 @@ func variableSubsitutionForAttributes(gen kyverno.Generation, ctx context.EvalIn
 	}
 	return gen
 }
+func copyInterface(original interface{}) (interface{}, error) {
+	tempData, err := json.Marshal(original)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(string(tempData))
+	var temp interface{}
+	err = json.Unmarshal(tempData, &temp)
+	if err != nil {
+		return nil, err
+	}
+	return temp, nil
+}
 
 func handleData(ruleName string, generateRule kyverno.Generation, client *dclient.Client, resource unstructured.Unstructured, ctx context.EvalInterface, state kyverno.GenerateRequestState) (map[string]interface{}, error) {
 	if invalidPaths := variables.ValidateVariables(ctx, generateRule.Data); len(invalidPaths) != 0 {
 		return nil, NewViolation(ruleName, fmt.Errorf("path not present in generate data: %s", invalidPaths))
 	}
 
-	newData := variables.SubstituteVariables(ctx, generateRule.Data)
+		//work on copy of the data
+	// as the type of data stoed in interface is not know,
+	// we marshall the data and unmarshal it into a new resource to create a copy
+	dataCopy, err := copyInterface(generateRule.Data)
+	if err != nil {
+		glog.V(4).Infof("failed to create a copy of the interface %v", generateRule.Data)
+		return nil, err
+	}
+
+	newData := variables.SubstituteVariables(ctx, dataCopy)
 
 	// check if resource exists
 	obj, err := client.GetResource(generateRule.Kind, generateRule.Namespace, generateRule.Name)
