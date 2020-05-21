@@ -7,7 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/nirmata/kyverno/pkg/openapi"
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/nirmata/kyverno/pkg/checker"
 	kyvernoclient "github.com/nirmata/kyverno/pkg/client/clientset/versioned"
@@ -17,6 +18,7 @@ import (
 	event "github.com/nirmata/kyverno/pkg/event"
 	"github.com/nirmata/kyverno/pkg/generate"
 	generatecleanup "github.com/nirmata/kyverno/pkg/generate/cleanup"
+	"github.com/nirmata/kyverno/pkg/openapi"
 	"github.com/nirmata/kyverno/pkg/policy"
 	"github.com/nirmata/kyverno/pkg/policystatus"
 	"github.com/nirmata/kyverno/pkg/policystore"
@@ -73,6 +75,10 @@ func main() {
 		setupLog.Error(err, "Failed to build kubeconfig")
 		os.Exit(1)
 	}
+
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
 
 	// KYVENO CRD CLIENT
 	// access CRD resources
@@ -245,7 +251,7 @@ func main() {
 	}
 
 	// Sync openAPI definitions of resources
-	openAPISync := openapi.NewCRDSync(client, openAPIController)
+	//openAPISync := openapi.NewCRDSync(client, openAPIController)
 
 	// WEBHOOOK
 	// - https server to provide endpoints called based on rules defined in Mutating & Validation webhook configuration
@@ -292,7 +298,7 @@ func main() {
 	go grcc.Run(1, stopCh)
 	go pvgen.Run(1, stopCh)
 	go statusSync.Run(1, stopCh)
-	openAPISync.Run(1, stopCh)
+	//openAPISync.Run(1, stopCh)
 
 	// verifys if the admission control is enabled and active
 	// resync: 60 seconds
