@@ -1,0 +1,149 @@
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    
+
+
+
+
+
+
+
+<meta charset="utf-8">
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+<meta name="generator" content="Hugo 0.71.1" />
+<meta name="description" content="From zero to docs deployed on Netlify in just a few minutes" />
+
+
+<meta property="og:title" content="Getting started">
+<meta property="og:type" content="documentation">
+<meta property="og:url" content="https://kyverno.netlify.com/docs/getting-started/">
+<meta property="og:locale" content="en_US">
+<meta property="og:site_name" content="Kyverno">
+<meta property="og:description" content="From zero to docs deployed on Netlify in just a few minutes">
+<meta name="og:type" content="article">
+<meta name="og:image" content="https://raw.githubusercontent.com/cncf/artwork/master/cncf/horizontal/color/cncf-color.png">
+<meta name="og:image:alt" content="Kyverno project logo">
+<meta name="og:image:type" content="image/png">
+
+
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@CloudNativeFdn">
+<meta name="twitter:creator" content="@CloudNativeFdn">
+
+<link rel="canonical" content="https://kyverno.netlify.com/docs/getting-started/">
+<link rel="shortcut icon" href="https://raw.githubusercontent.com/cncf/artwork/master/cncf/icon/color/cncf-icon-color.png" type="image/png">
+
+    <title>
+Kyverno | Docs | Getting started
+</title>
+    
+<link rel="stylesheet" href="/sass/style.sass" integrity="">
+
+
+  </head>
+  <body class="page">
+    <div class="main">
+      
+
+
+
+
+<div class="dashboard">
+  <div class="dashboard-panel left has-thick-padding is-hidden-mobile">
+    <div class="dashboard-panel-header has-text-centered">
+      <a href="https://kyverno.netlify.com">
+        <img class="dashboard-panel-logo" src="https://raw.githubusercontent.com/cncf/artwork/master/cncf/icon/color/cncf-icon-color.png">
+      </a>
+
+      <p class="title is-size-4 has-text-weight-light">
+        Kyverno
+      </p>
+    </div>
+
+    <div class="dashboard-panel-main">
+      <div class="dashboard-panel-main-toc">
+        <ul>
+          
+          <li>
+            <a href="/docs/">
+              Documentation
+            </a>
+          </li>
+          
+          <li>
+            <a href="/docs/getting-started/">
+              Getting started
+            </a>
+          </li>
+          
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="dashboard-main is-scrollable">
+    <section class="hero is-primary">
+      <div class="hero-body">
+        <p class="title is-spaced">
+          Getting started
+        </p>
+        
+        <p class="subtitle">
+          From zero to docs deployed on Netlify in just a few minutes
+        </p>
+        
+      </div>
+    </section>
+
+    <section class="section">
+
+      <div class="content">
+        <p>If you&rsquo;re working on a new <a href="https://cncf.io">Cloud Native Computing Foundation</a> (CNCF) project, an older project that wants to revamp its site and docs, or a project that&rsquo;s not affiliated with the CNCF at all, you can deploy a project by:</p>
+<ul>
+<li><a href="#deps">Installing dependencies</a></li>
+<li><a href="#clone">Cloning the Docs in a Box repo</a></li>
+<li><a href="#repo">Creating a new repo for your project</a></li>
+<li><a href="#run">Run the site locallt</a></li>
+<li><a href="#netlify">Setting up Netlify</a></li>
+</ul>
+<h2 id="deps">Install dependencies</h2>
+<h3 id="macos">macOS</h3>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">brew install hugo
+</code></pre></div><blockquote>
+<p>Make sure to install the version of Hugo specified in the <a href="https://github.com/cncf/site-boilerplate/blob/master/netlify.toml"><code>netlify.toml</code></a> configuration file.</p>
+</blockquote>
+<h2 id="clone">Clone the repo</h2>
+<p>To get started:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">git clone https://github.com/cncf/site-boilerplate <span style="color:#f92672">&amp;&amp;</span> cd site-boilerplate
+</code></pre></div><h2 id="repo">Create a new repo</h2>
+<p>In order to publish your Docs in a Box project <a href="#netlify">on Netlify</a>, create a new <a href="https://github.com">GitHub</a> repo for the project.</p>
+<h2 id="run-your-project-locally">Run your project locally</h2>
+<p>To run the project locally:</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-shell" data-lang="shell">make serve
+</code></pre></div><p>Navigate to http://localhost:1313 in your browser and you should see this exact same site up and running locally!</p>
+<h2 id="set-up-netlify">Set up Netlify</h2>
+<p><a href="https://netlify.com">Netlify</a> is the default publishing platform for CNCF projects.</p>
+<p>To run your project on Netlify:</p>
+<ul>
+<li>Create a Netlify account</li>
+<li>Create a new Netlify project</li>
+<li>Link the project to your</li>
+</ul>
+
+      </div>
+    </section>
+  </div>
+</div>
+
+    </div>
+
+    
+<script src="/js/jquery-3.3.1.min.1dc33fb32cfedd9ef0049ed3cb8b007bad6f7e57eafc760e8ea0553fe823a6d6.js" integrity="sha256-HcM/syz&#43;3Z7wBJ7Ty4sAe61vflfq/HYOjqBVP&#43;gjptY="></script>
+<script src="/js/app.min.dab7cf77d2a78a666c3962294e12ff3a20a85884bd156d9e14ac7b2f631c2386.js" integrity="sha256-2rfPd9KnimZsOWIpThL/OiCoWIS9FW2eFKx7L2McI4Y="></script>
+
+  </body>
+</html>
