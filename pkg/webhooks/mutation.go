@@ -21,7 +21,9 @@ import (
 func (ws *WebhookServer) HandleMutation(
 	request *v1beta1.AdmissionRequest,
 	resource unstructured.Unstructured,
-	policies []kyverno.ClusterPolicy, roles, clusterRoles []string) []byte {
+	policies []*kyverno.ClusterPolicy,
+	ctx *context.Context,
+	userRequestInfo kyverno.RequestInfo) []byte {
 
 	resourceName := request.Kind.Kind + "/" + request.Name
 	if request.Namespace != "" {
@@ -32,30 +34,6 @@ func (ws *WebhookServer) HandleMutation(
 
 	var patches [][]byte
 	var engineResponses []response.EngineResponse
-
-	userRequestInfo := kyverno.RequestInfo{
-		Roles:             roles,
-		ClusterRoles:      clusterRoles,
-		AdmissionUserInfo: request.UserInfo}
-
-	// build context
-	ctx := context.NewContext()
-	var err error
-	// load incoming resource into the context
-	err = ctx.AddResource(request.Object.Raw)
-	if err != nil {
-		logger.Error(err, "failed to load incoming resource in context")
-	}
-
-	err = ctx.AddUserInfo(userRequestInfo)
-	if err != nil {
-		logger.Error(err, "failed to load userInfo in context")
-	}
-	err = ctx.AddSA(userRequestInfo.AdmissionUserInfo.Username)
-	if err != nil {
-		logger.Error(err, "failed to load service account in context")
-	}
-
 	policyContext := engine.PolicyContext{
 		NewResource:   resource,
 		AdmissionInfo: userRequestInfo,
@@ -65,16 +43,13 @@ func (ws *WebhookServer) HandleMutation(
 	for _, policy := range policies {
 		logger.V(3).Info("evaluating policy", "policy", policy.Name)
 
-		policyContext.Policy = policy
+		policyContext.Policy = *policy
 		engineResponse := engine.Mutate(policyContext)
-		if engineResponse.PolicyResponse.RulesAppliedCount <= 0 {
-			continue
-		}
 
 		engineResponses = append(engineResponses, engineResponse)
 		ws.statusListener.Send(mutateStats{resp: engineResponse})
 		if !engineResponse.IsSuccesful() {
-			logger.Info("failed to apply policy", "policy", policy.Name)
+			logger.Info("failed to apply policy", "policy", policy.Name, "failed rules", engineResponse.GetFailedRules())
 			continue
 		}
 

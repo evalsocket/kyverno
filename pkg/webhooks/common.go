@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	yamlv2 "gopkg.in/yaml.v2"
 	kyverno "github.com/nirmata/kyverno/pkg/api/kyverno/v1"
 	"github.com/nirmata/kyverno/pkg/engine/response"
 	engineutils "github.com/nirmata/kyverno/pkg/engine/utils"
+	yamlv2 "gopkg.in/yaml.v2"
 	"k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -115,7 +115,7 @@ func processResourceWithPatches(patch []byte, resource []byte, log logr.Logger) 
 	return resource
 }
 
-func containRBACinfo(policies []kyverno.ClusterPolicy) bool {
+func containRBACinfo(policies []*kyverno.ClusterPolicy) bool {
 	for _, policy := range policies {
 		for _, rule := range policy.Spec.Rules {
 			if len(rule.MatchResources.Roles) > 0 || len(rule.MatchResources.ClusterRoles) > 0 || len(rule.ExcludeResources.Roles) > 0 || len(rule.ExcludeResources.ClusterRoles) > 0 {
@@ -166,4 +166,14 @@ func convertResource(raw []byte, group, version, kind, namespace string) (unstru
 	obj.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: version, Kind: kind})
 	obj.SetNamespace(namespace)
 	return *obj, nil
+}
+
+func excludeKyvernoResources(kind string) bool {
+	switch kind {
+	case "ClusterPolicy", "ClusterPolicyViolation", "PolicyViolation", "GenerateRequest":
+		return true
+	default:
+		return false
+	}
+
 }

@@ -70,7 +70,7 @@ spec:
                               type: string
                             name:
                               type: string
-                            Namespace:
+                            namespace:
                               type: string
                       resources:
                         type: object
@@ -133,7 +133,7 @@ spec:
                               type: string
                             name:
                               type: string
-                            Namespace:
+                            namespace:
                               type: string
                       resources:
                         type: object
@@ -210,6 +210,28 @@ spec:
                         AnyValue: {}
                       anyPattern:
                         AnyValue: {}
+                      deny:
+                        properties:
+                          conditions:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                                - key  # can be of any type
+                                - operator # typed
+                                - value # can be of any type
+                              properties:
+                                operator:
+                                  type: string
+                                  enum:
+                                  - Equal
+                                  - Equals
+                                  - NotEqual
+                                  - NotEquals
+                                key:
+                                  type: string
+                                value:
+                                  type: string
                   generate:
                     type: object
                     required:
@@ -685,7 +707,7 @@ metadata:
   namespace: kyverno
 data:
   # resource types to be skipped by kyverno policy engine
-  resourceFilters: "[Event,*,*][*,kube-system,*][*,kube-public,*][*,kube-node-lease,*][Node,*,*][APIService,*,*][TokenReview,*,*][SubjectAccessReview,*,*][*,kyverno,*]"
+  resourceFilters: "[Event,*,*][*,kube-system,*][*,kube-public,*][*,kube-node-lease,*][Node,*,*][APIService,*,*][TokenReview,*,*][SubjectAccessReview,*,*][*,kyverno,*][Binding,*,*][ReplicaSet,*,*]"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -707,16 +729,44 @@ spec:
       serviceAccountName: kyverno-service-account
       initContainers:
         - name: kyverno-pre
-          image: nirmata/kyvernopre:v1.1.5
+          image: nirmata/kyvernopre:v1.1.6-rc1
       containers:
         - name: kyverno
-          image: nirmata/kyverno:v1.1.5
+          image: registry-v2.nirmata.io/nirmata/kyverno:latest
+          imagePullPolicy: Always
           args:
           - "--filterK8Resources=[Event,*,*][*,kube-system,*][*,kube-public,*][*,kube-node-lease,*][Node,*,*][APIService,*,*][TokenReview,*,*][SubjectAccessReview,*,*][*,kyverno,*][Binding,*,*][ReplicaSet,*,*]"
-          # customize webhook timout
-          # - "--webhooktimeout=4"
+          # customize webhook timeout
+          #- "--webhooktimeout=4"
+          - "-v=2"
           ports:
           - containerPort: 443
           env:
           - name: INIT_CONFIG
             value: init-config
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 4
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: 443
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 4
+            successThreshold: 1

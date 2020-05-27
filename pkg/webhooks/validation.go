@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/nirmata/kyverno/pkg/utils"
+
 	kyverno "github.com/nirmata/kyverno/pkg/api/kyverno/v1"
 	v1 "github.com/nirmata/kyverno/pkg/api/kyverno/v1"
 	"github.com/nirmata/kyverno/pkg/engine"
@@ -12,6 +14,8 @@ import (
 	"github.com/nirmata/kyverno/pkg/engine/response"
 	"github.com/nirmata/kyverno/pkg/policyviolation"
 	v1beta1 "k8s.io/api/admission/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // HandleValidation handles validating webhook admission request
@@ -19,8 +23,10 @@ import (
 // patchedResource is the (resource + patches) after applying mutation rules
 func (ws *WebhookServer) HandleValidation(
 	request *v1beta1.AdmissionRequest,
-	policies []kyverno.ClusterPolicy,
-	patchedResource []byte, roles, clusterRoles []string) (bool, string) {
+	policies []*kyverno.ClusterPolicy,
+	patchedResource []byte,
+	ctx *context.Context,
+	userRequestInfo kyverno.RequestInfo) (bool, string) {
 
 	resourceName := request.Kind.Kind + "/" + request.Name
 	if request.Namespace != "" {
@@ -30,33 +36,22 @@ func (ws *WebhookServer) HandleValidation(
 	logger := ws.log.WithValues("action", "validate", "resource", resourceName, "operation", request.Operation)
 
 	// Get new and old resource
-	newR, oldR, err := extractResources(patchedResource, request)
+	newR, oldR, err := utils.ExtractResources(patchedResource, request)
 	if err != nil {
 		// as resource cannot be parsed, we skip processing
 		logger.Error(err, "failed to extract resource")
 		return true, ""
 	}
 
-	userRequestInfo := kyverno.RequestInfo{
-		Roles:             roles,
-		ClusterRoles:      clusterRoles,
-		AdmissionUserInfo: request.UserInfo}
-	// build context
-	ctx := context.NewContext()
-	// load incoming resource into the context
-	err = ctx.AddResource(request.Object.Raw)
-	if err != nil {
-		logger.Error(err, "failed to load incoming resource in context")
+	var deletionTimeStamp *metav1.Time
+	if reflect.DeepEqual(newR, unstructured.Unstructured{}) {
+		deletionTimeStamp = newR.GetDeletionTimestamp()
+	} else {
+		deletionTimeStamp = oldR.GetDeletionTimestamp()
 	}
 
-	err = ctx.AddUserInfo(userRequestInfo)
-	if err != nil {
-		logger.Error(err, "failed to load userInfo in context")
-	}
-
-	err = ctx.AddSA(userRequestInfo.AdmissionUserInfo.Username)
-	if err != nil {
-		logger.Error(err, "failed to load service account in context")
+	if deletionTimeStamp != nil && request.Operation == v1beta1.Update {
+		return true, ""
 	}
 
 	policyContext := engine.PolicyContext{
@@ -65,10 +60,11 @@ func (ws *WebhookServer) HandleValidation(
 		Context:       ctx,
 		AdmissionInfo: userRequestInfo,
 	}
+
 	var engineResponses []response.EngineResponse
 	for _, policy := range policies {
 		logger.V(3).Info("evaluating policy", "policy", policy.Name)
-		policyContext.Policy = policy
+		policyContext.Policy = *policy
 		engineResponse := engine.Validate(policyContext)
 		if reflect.DeepEqual(engineResponse, response.EngineResponse{}) {
 			// we get an empty response if old and new resources created the same response
@@ -80,7 +76,7 @@ func (ws *WebhookServer) HandleValidation(
 			resp: engineResponse,
 		})
 		if !engineResponse.IsSuccesful() {
-			logger.V(4).Info("failed to apply policy", "policy", policy.Name)
+			logger.V(4).Info("failed to apply policy", "policy", policy.Name, "failed rules", engineResponse.GetFailedRules())
 			continue
 		}
 

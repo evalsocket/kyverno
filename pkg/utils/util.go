@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -9,6 +10,9 @@ import (
 	"github.com/minio/minio/pkg/wildcard"
 	client "github.com/nirmata/kyverno/pkg/dclient"
 	dclient "github.com/nirmata/kyverno/pkg/dclient"
+	engineutils "github.com/nirmata/kyverno/pkg/engine/utils"
+	"k8s.io/api/admission/v1beta1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -89,8 +93,51 @@ func CleanupOldCrd(client *dclient.Client, log logr.Logger) {
 	}
 }
 
-// CompareKubernetesVersion compare kuberneates client version to user given version
-func CompareKubernetesVersion(client *client.Client, log logr.Logger, k8smajor, k8sminor, k8ssub int) bool {
+// extracts the new and old resource as unstructured
+func ExtractResources(newRaw []byte, request *v1beta1.AdmissionRequest) (unstructured.Unstructured, unstructured.Unstructured, error) {
+	var emptyResource unstructured.Unstructured
+	var newResource unstructured.Unstructured
+	var oldResource unstructured.Unstructured
+	var err error
+
+	// New Resource
+	if newRaw == nil {
+		newRaw = request.Object.Raw
+	}
+
+	if newRaw != nil {
+		newResource, err = ConvertResource(newRaw, request.Kind.Group, request.Kind.Version, request.Kind.Kind, request.Namespace)
+		if err != nil {
+			return emptyResource, emptyResource, fmt.Errorf("failed to convert new raw to unstructured: %v", err)
+		}
+	}
+
+	// Old Resource
+	oldRaw := request.OldObject.Raw
+	if oldRaw != nil {
+		oldResource, err = ConvertResource(oldRaw, request.Kind.Group, request.Kind.Version, request.Kind.Kind, request.Namespace)
+		if err != nil {
+			return emptyResource, emptyResource, fmt.Errorf("failed to convert old raw to unstructured: %v", err)
+		}
+	}
+
+	return newResource, oldResource, err
+}
+
+// convertResource converts raw bytes to an unstructured object
+func ConvertResource(raw []byte, group, version, kind, namespace string) (unstructured.Unstructured, error) {
+	obj, err := engineutils.ConvertToUnstructured(raw)
+	if err != nil {
+		return unstructured.Unstructured{}, fmt.Errorf("failed to convert raw to unstructured: %v", err)
+	}
+
+	obj.SetGroupVersionKind(schema.GroupVersionKind{Group: group, Version: version, Kind: kind})
+	obj.SetNamespace(namespace)
+	return *obj, nil
+}
+
+// HigherThanKubernetesVersion compare kuberneates client version to user given version
+func HigherThanKubernetesVersion(client *client.Client, log logr.Logger, k8smajor, k8sminor, k8ssub int) bool {
 	logger := log.WithName("CompareKubernetesVersion")
 	serverVersion, err := client.DiscoveryClient.GetServerVersion()
 	if err != nil {
@@ -124,4 +171,20 @@ func CompareKubernetesVersion(client *client.Client, log logr.Logger, k8smajor, 
 		return false
 	}
 	return true
+}
+
+func SliceContains(slice []string, values ...string) bool {
+
+	var sliceElementsMap = make(map[string]bool, len(slice))
+	for _, sliceElement := range slice {
+		sliceElementsMap[sliceElement] = true
+	}
+
+	for _, value := range values {
+		if sliceElementsMap[value] {
+			return true
+		}
+	}
+
+	return false
 }
