@@ -16,6 +16,15 @@ make cli
 mv ./cmd/cli/kubectl-kyverno/kyverno /usr/local/bin/kyverno
 ```
 
+You can also use [Krew](https://github.com/kubernetes-sigs/krew)
+```bash
+# Install kyverno using krew plugin manager
+kubectl krew install kyverno 
+
+#example 
+kuberctl kyverno version  
+```
+
 ## Install via AUR (archlinux)
 
 You can install the kyverno cli via your favourite AUR helper (e.g. [yay](https://github.com/Jguer/yay))
