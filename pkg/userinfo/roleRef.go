@@ -131,7 +131,7 @@ func matchUserOrGroup(subject rbacv1.Subject, userInfo authenticationv1.UserInfo
 }
 
 //IsRoleAuthorize is role authorize or not
-func IsRoleAuthorize(rbLister rbaclister.RoleBindingLister, crbLister rbaclister.ClusterRoleBindingLister, rLister rbaclister.RoleLister, crLister rbaclister.ClusterRoleLister, request *v1beta1.AdmissionRequest) (bool, error) {
+func IsRoleAuthorize(rbLister rbaclister.RoleBindingLister, crbLister rbaclister.ClusterRoleBindingLister, rLister rbaclister.RoleLister, crLister rbaclister.ClusterRoleLister, request *v1beta1.AdmissionRequest,excludeRole []string) (bool, error) {
 	if strings.Contains(request.UserInfo.Username, SaPrefix) {
 		roles, clusterRoles, err := GetRoleRef(rbLister, crbLister, request)
 		if err != nil {
