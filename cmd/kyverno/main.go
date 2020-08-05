@@ -48,6 +48,7 @@ var (
 	filterK8Resources string
 	// User FQDN as CSR CN
 	fqdncn   bool
+	scan   bool
 	setupLog = log.Log.WithName("setup")
 )
 
@@ -60,6 +61,7 @@ func main() {
 	flag.StringVar(&serverIP, "serverIP", "", "IP address where Kyverno controller runs. Only required if out-of-cluster.")
 	flag.StringVar(&runValidationInMutatingWebhook, "runValidationInMutatingWebhook", "", "Validation will also be done using the mutation webhook, set to 'true' to enable. Older kubernetes versions do not work properly when a validation webhook is registered.")
 	flag.BoolVar(&profile, "profile", false, "Set this flag to 'true', to enable profiling.")
+	flag.BoolVar(&scan, "scan", false, "Set this flag to 'true', to start report job.")
 	if err := flag.Set("v", "2"); err != nil {
 		setupLog.Error(err, "failed to set log level")
 		os.Exit(1)
@@ -100,12 +102,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TODO: Add logic for new crd like report
 	// CRD CHECK
 	// - verify if the CRD for Policy & PolicyViolation are available
 	if !utils.CRDInstalled(client.DiscoveryClient, log.Log) {
 		setupLog.Error(fmt.Errorf("CRDs not installed"), "Failed to access Kyverno CRDs")
 		os.Exit(1)
 	}
+
 
 	kubeClient, err := utils.NewKubeClient(clientConfig)
 	if err != nil {
@@ -119,29 +123,7 @@ func main() {
 	kubeInformer := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, resyncPeriod)
 	kubedynamicInformer := client.NewDynamicSharedInformerFactory(resyncPeriod)
 
-	webhookRegistrationClient := webhookconfig.NewWebhookRegistrationClient(
-		clientConfig,
-		client,
-		serverIP,
-		int32(webhookTimeout),
-		log.Log)
-
-	// Resource Mutating Webhook Watcher
-	lastReqTime := checker.NewLastReqTime(log.Log.WithName("LastReqTime"))
-	rWebhookWatcher := webhookconfig.NewResourceWebhookRegister(
-		lastReqTime,
-		kubeInformer.Admissionregistration().V1beta1().MutatingWebhookConfigurations(),
-		kubeInformer.Admissionregistration().V1beta1().ValidatingWebhookConfigurations(),
-		webhookRegistrationClient,
-		runValidationInMutatingWebhook,
-		log.Log.WithName("ResourceWebhookRegister"),
-	)
-
-	// KYVERNO CRD INFORMER
-	// watches CRD resources:
-	//		- Policy
-	//		- PolicyVolation
-	pInformer := kyvernoinformer.NewSharedInformerFactoryWithOptions(pclient, resyncPeriod)
+	var webhookRegistrationClient  *webhookconfig.WebhookRegistrationClient
 
 	// Configuration Data
 	// dynamically load the configuration from configMap
@@ -154,193 +136,220 @@ func main() {
 		log.Log.WithName("ConfigData"),
 	)
 
-	// EVENT GENERATOR
-	// - generate event with retry mechanism
-	eventGenerator := event.NewEventGenerator(
-		client,
-		pInformer.Kyverno().V1().ClusterPolicies(),
-		log.Log.WithName("EventGenerator"))
-
-	// Policy Status Handler - deals with all logic related to policy status
-	statusSync := policystatus.NewSync(
-		pclient,
-		pInformer.Kyverno().V1().ClusterPolicies().Lister())
-
-	// POLICY VIOLATION GENERATOR
-	// -- generate policy violation
-	pvgen := policyviolation.NewPVGenerator(pclient,
-		client,
-		pInformer.Kyverno().V1().ClusterPolicyViolations(),
-		pInformer.Kyverno().V1().PolicyViolations(),
-		statusSync.Listener,
-		log.Log.WithName("PolicyViolationGenerator"),
-	)
-
-	// POLICY CONTROLLER
-	// - reconciliation policy and policy violation
-	// - process policy on existing resources
-	// - status aggregator: receives stats when a policy is applied & updates the policy status
-	policyCtrl, err := policy.NewPolicyController(pclient,
-		client,
-		pInformer.Kyverno().V1().ClusterPolicies(),
-		pInformer.Kyverno().V1().ClusterPolicyViolations(),
-		pInformer.Kyverno().V1().PolicyViolations(),
-		configData,
-		eventGenerator,
-		pvgen,
-		rWebhookWatcher,
-		kubeInformer.Core().V1().Namespaces(),
-		log.Log.WithName("PolicyController"),
-	)
-
-	if err != nil {
-		setupLog.Error(err, "Failed to create policy controller")
-		os.Exit(1)
-	}
-
-	// GENERATE REQUEST GENERATOR
-	grgen := webhookgenerate.NewGenerator(pclient, stopCh, log.Log.WithName("GenerateRequestGenerator"))
-
-	// GENERATE CONTROLLER
-	// - applies generate rules on resources based on generate requests created by webhook
-	grc := generate.NewController(
-		pclient,
-		client,
-		pInformer.Kyverno().V1().ClusterPolicies(),
-		pInformer.Kyverno().V1().GenerateRequests(),
-		eventGenerator,
-		kubedynamicInformer,
-		statusSync.Listener,
-		log.Log.WithName("GenerateController"),
-	)
-
-	// GENERATE REQUEST CLEANUP
-	// -- cleans up the generate requests that have not been processed(i.e. state = [Pending, Failed]) for more than defined timeout
-	grcc := generatecleanup.NewController(
-		pclient,
-		client,
-		pInformer.Kyverno().V1().ClusterPolicies(),
-		pInformer.Kyverno().V1().GenerateRequests(),
-		kubedynamicInformer,
-		log.Log.WithName("GenerateCleanUpController"),
-	)
-
-	pCacheController := policycache.NewPolicyCacheController(
-		pInformer.Kyverno().V1().ClusterPolicies(),
-		log.Log.WithName("PolicyCacheController"),
-	)
-
-	auditHandler := webhooks.NewValidateAuditHandler(
-		pCacheController.Cache,
-		eventGenerator,
-		statusSync.Listener,
-		pvgen,
-		kubeInformer.Rbac().V1().RoleBindings(),
-		kubeInformer.Rbac().V1().ClusterRoleBindings(),
-		log.Log.WithName("ValidateAuditHandler"),
-	)
-
-	// CONFIGURE CERTIFICATES
-	tlsPair, err := client.InitTLSPemPair(clientConfig, fqdncn)
-	if err != nil {
-		setupLog.Error(err, "Failed to initialize TLS key/certificate pair")
-		os.Exit(1)
-	}
-
-	// WEBHOOK REGISTRATION
-	// - mutating,validatingwebhookconfiguration (Policy)
-	// - verifymutatingwebhookconfiguration (Kyverno Deployment)
-	// resource webhook confgiuration is generated dynamically in the webhook server and policy controller
-	// based on the policy resources created
-	if err = webhookRegistrationClient.Register(); err != nil {
-		setupLog.Error(err, "Failed to register Admission webhooks")
-		os.Exit(1)
-	}
-
-	openAPIController, err := openapi.NewOpenAPIController()
-	if err != nil {
-		setupLog.Error(err, "Failed to create openAPIController")
-		os.Exit(1)
-	}
-
-	// Sync openAPI definitions of resources
-	openAPISync := openapi.NewCRDSync(client, openAPIController)
-
-	supportMudateValidate := utils.HigherThanKubernetesVersion(client, log.Log, 1, 14, 0)
-
-	// WEBHOOK
-	// - https server to provide endpoints called based on rules defined in Mutating & Validation webhook configuration
-	// - reports the results based on the response from the policy engine:
-	// -- annotations on resources with update details on mutation JSON patches
-	// -- generate policy violation resource
-	// -- generate events on policy and resource
-	server, err := webhooks.NewWebhookServer(
-		pclient,
-		client,
-		tlsPair,
-		pInformer.Kyverno().V1().ClusterPolicies(),
-		kubeInformer.Rbac().V1().RoleBindings(),
-		kubeInformer.Rbac().V1().ClusterRoleBindings(),
-		kubeInformer.Rbac().V1().Roles(),
-		kubeInformer.Rbac().V1().ClusterRoles(),
-		eventGenerator,
-		pCacheController.Cache,
-		webhookRegistrationClient,
-		statusSync.Listener,
-		configData,
-		pvgen,
-		grgen,
-		rWebhookWatcher,
-		auditHandler,
-		supportMudateValidate,
-		cleanUp,
-		log.Log.WithName("WebhookServer"),
-		openAPIController,
-	)
-
-	if err != nil {
-		setupLog.Error(err, "Failed to create webhook server")
-		os.Exit(1)
-	}
-
-	// Start the components
-	pInformer.Start(stopCh)
 	kubeInformer.Start(stopCh)
 	kubedynamicInformer.Start(stopCh)
-	go grgen.Run(1)
-	go rWebhookWatcher.Run(stopCh)
 	go configData.Run(stopCh)
-	go policyCtrl.Run(3, stopCh)
-	go eventGenerator.Run(1, stopCh)
-	go grc.Run(1, stopCh)
-	go grcc.Run(1, stopCh)
-	go pvgen.Run(1, stopCh)
-	go statusSync.Run(1, stopCh)
-	go pCacheController.Run(1, stopCh)
-	go auditHandler.Run(10, stopCh)
-	openAPISync.Run(1, stopCh)
 
-	// verifys if the admission control is enabled and active
-	// resync: 60 seconds
-	// deadline: 60 seconds (send request)
-	// max deadline: deadline*3 (set the deployment annotation as false)
-	server.RunAsync(stopCh)
+	if !scan {
+		webhookRegistrationClient = webhookconfig.NewWebhookRegistrationClient(
+			clientConfig,
+			client,
+			serverIP,
+			int32(webhookTimeout),
+			log.Log)
 
-	<-stopCh
+		// Resource Mutating Webhook Watcher
+		lastReqTime := checker.NewLastReqTime(log.Log.WithName("LastReqTime"))
+		rWebhookWatcher := webhookconfig.NewResourceWebhookRegister(
+			lastReqTime,
+			kubeInformer.Admissionregistration().V1beta1().MutatingWebhookConfigurations(),
+			kubeInformer.Admissionregistration().V1beta1().ValidatingWebhookConfigurations(),
+			webhookRegistrationClient,
+			runValidationInMutatingWebhook,
+			log.Log.WithName("ResourceWebhookRegister"),
+		)
+		// KYVERNO CRD INFORMER
+		// watches CRD resources:
+		//		- Policy
+		//		- PolicyVolation
+		pInformer := kyvernoinformer.NewSharedInformerFactoryWithOptions(pclient, resyncPeriod)
 
-	// by default http.Server waits indefinitely for connections to return to idle and then shuts down
-	// adding a threshold will handle zombie connections
-	// adjust the context deadline to 5 seconds
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer func() {
-		cancel()
-	}()
+		// EVENT GENERATOR
+		// - generate event with retry mechanism
+		eventGenerator := event.NewEventGenerator(
+			client,
+			pInformer.Kyverno().V1().ClusterPolicies(),
+			log.Log.WithName("EventGenerator"))
 
-	// cleanup webhookconfigurations followed by webhook shutdown
-	server.Stop(ctx)
+		// Policy Status Handler - deals with all logic related to policy status
+		statusSync := policystatus.NewSync(
+			pclient,
+			pInformer.Kyverno().V1().ClusterPolicies().Lister())
 
-	// resource cleanup
-	// remove webhook configurations
-	<-cleanUp
-	setupLog.Info("Kyverno shutdown successful")
+		// POLICY VIOLATION GENERATOR
+		// -- generate policy violation
+		pvgen := policyviolation.NewPVGenerator(pclient,
+			client,
+			pInformer.Kyverno().V1().ClusterPolicyViolations(),
+			pInformer.Kyverno().V1().PolicyViolations(),
+			statusSync.Listener,
+			log.Log.WithName("PolicyViolationGenerator"),
+		)
+
+		// POLICY CONTROLLER
+		// - reconciliation policy and policy violation
+		// - process policy on existing resources
+		// - status aggregator: receives stats when a policy is applied & updates the policy status
+		policyCtrl, err := policy.NewPolicyController(pclient,
+			client,
+			pInformer.Kyverno().V1().ClusterPolicies(),
+			pInformer.Kyverno().V1().ClusterPolicyViolations(),
+			pInformer.Kyverno().V1().PolicyViolations(),
+			configData,
+			eventGenerator,
+			pvgen,
+			rWebhookWatcher,
+			kubeInformer.Core().V1().Namespaces(),
+			log.Log.WithName("PolicyController"),
+		)
+
+		if err != nil {
+			setupLog.Error(err, "Failed to create policy controller")
+			os.Exit(1)
+		}
+
+		// GENERATE REQUEST GENERATOR
+		grgen := webhookgenerate.NewGenerator(pclient, stopCh, log.Log.WithName("GenerateRequestGenerator"))
+
+		// GENERATE CONTROLLER
+		// - applies generate rules on resources based on generate requests created by webhook
+		grc := generate.NewController(
+			pclient,
+			client,
+			pInformer.Kyverno().V1().ClusterPolicies(),
+			pInformer.Kyverno().V1().GenerateRequests(),
+			eventGenerator,
+			kubedynamicInformer,
+			statusSync.Listener,
+			log.Log.WithName("GenerateController"),
+		)
+
+		// GENERATE REQUEST CLEANUP
+		// -- cleans up the generate requests that have not been processed(i.e. state = [Pending, Failed]) for more than defined timeout
+		grcc := generatecleanup.NewController(
+			pclient,
+			client,
+			pInformer.Kyverno().V1().ClusterPolicies(),
+			pInformer.Kyverno().V1().GenerateRequests(),
+			kubedynamicInformer,
+			log.Log.WithName("GenerateCleanUpController"),
+		)
+
+		pCacheController := policycache.NewPolicyCacheController(
+			pInformer.Kyverno().V1().ClusterPolicies(),
+			log.Log.WithName("PolicyCacheController"),
+		)
+
+		auditHandler := webhooks.NewValidateAuditHandler(
+			pCacheController.Cache,
+			eventGenerator,
+			statusSync.Listener,
+			pvgen,
+			kubeInformer.Rbac().V1().RoleBindings(),
+			kubeInformer.Rbac().V1().ClusterRoleBindings(),
+			log.Log.WithName("ValidateAuditHandler"),
+		)
+
+		// CONFIGURE CERTIFICATES
+		tlsPair, err := client.InitTLSPemPair(clientConfig, fqdncn)
+		if err != nil {
+			setupLog.Error(err, "Failed to initialize TLS key/certificate pair")
+			os.Exit(1)
+		}
+
+		// WEBHOOK REGISTRATION
+		// - mutating,validatingwebhookconfiguration (Policy)
+		// - verifymutatingwebhookconfiguration (Kyverno Deployment)
+		// resource webhook confgiuration is generated dynamically in the webhook server and policy controller
+		// based on the policy resources created
+		if err = webhookRegistrationClient.Register(); err != nil {
+			setupLog.Error(err, "Failed to register Admission webhooks")
+			os.Exit(1)
+		}
+
+		openAPIController, err := openapi.NewOpenAPIController()
+		if err != nil {
+			setupLog.Error(err, "Failed to create openAPIController")
+			os.Exit(1)
+		}
+
+		// Sync openAPI definitions of resources
+		openAPISync := openapi.NewCRDSync(client, openAPIController)
+
+		supportMudateValidate := utils.HigherThanKubernetesVersion(client, log.Log, 1, 14, 0)
+
+		// WEBHOOK
+		// - https server to provide endpoints called based on rules defined in Mutating & Validation webhook configuration
+		// - reports the results based on the response from the policy engine:
+		// -- annotations on resources with update details on mutation JSON patches
+		// -- generate policy violation resource
+		// -- generate events on policy and resource
+		server, err := webhooks.NewWebhookServer(
+			pclient,
+			client,
+			tlsPair,
+			pInformer.Kyverno().V1().ClusterPolicies(),
+			kubeInformer.Rbac().V1().RoleBindings(),
+			kubeInformer.Rbac().V1().ClusterRoleBindings(),
+			kubeInformer.Rbac().V1().Roles(),
+			kubeInformer.Rbac().V1().ClusterRoles(),
+			eventGenerator,
+			pCacheController.Cache,
+			webhookRegistrationClient,
+			statusSync.Listener,
+			configData,
+			pvgen,
+			grgen,
+			rWebhookWatcher,
+			auditHandler,
+			supportMudateValidate,
+			cleanUp,
+			log.Log.WithName("WebhookServer"),
+			openAPIController,
+		)
+
+		if err != nil {
+			setupLog.Error(err, "Failed to create webhook server")
+			os.Exit(1)
+		}
+
+		// Start the components
+		pInformer.Start(stopCh)
+		go grgen.Run(1)
+		go rWebhookWatcher.Run(stopCh)
+		go policyCtrl.Run(3, stopCh)
+		go eventGenerator.Run(1, stopCh)
+		go grc.Run(1, stopCh)
+		go grcc.Run(1, stopCh)
+		go pvgen.Run(1, stopCh)
+		go statusSync.Run(1, stopCh)
+		go pCacheController.Run(1, stopCh)
+		go auditHandler.Run(10, stopCh)
+		openAPISync.Run(1, stopCh)
+		// verifys if the admission control is enabled and active
+		// resync: 60 seconds
+		// deadline: 60 seconds (send request)
+		// max deadline: deadline*3 (set the deployment annotation as false)
+		server.RunAsync(stopCh)
+
+		<-stopCh
+
+		// by default http.Server waits indefinitely for connections to return to idle and then shuts down
+		// adding a threshold will handle zombie connections
+		// adjust the context deadline to 5 seconds
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer func() {
+			cancel()
+		}()
+
+		// cleanup webhookconfigurations followed by webhook shutdown
+		server.Stop(ctx)
+
+		// resource cleanup
+		// remove webhook configurations
+		<-cleanUp
+		setupLog.Info("Kyverno shutdown successful")
+	}else{
+		//TDOD: Add logic
+	}
 }
