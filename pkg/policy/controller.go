@@ -93,8 +93,8 @@ type PolicyController struct {
 func NewPolicyController(kyvernoClient *kyvernoclient.Clientset,
 	client *client.Client,
 	pInformer kyvernoinformer.ClusterPolicyInformer,
-	cpvInformer kyvernoinformer.ClusterPolicyViolationInformer,
-	nspvInformer kyvernoinformer.PolicyViolationInformer,
+	//cpvInformer kyvernoinformer.ClusterPolicyViolationInformer,
+	//nspvInformer kyvernoinformer.PolicyViolationInformer,
 	configHandler config.Interface, eventGen event.Interface,
 	resourceWebhookWatcher *webhookconfig.ResourceWebhookRegister,
 	namespaces informers.NamespaceInformer,
@@ -128,26 +128,26 @@ func NewPolicyController(kyvernoClient *kyvernoclient.Clientset,
 		DeleteFunc: pc.deletePolicy,
 	})
 
-	cpvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    pc.addClusterPolicyViolation,
-		UpdateFunc: pc.updateClusterPolicyViolation,
-		DeleteFunc: pc.deleteClusterPolicyViolation,
-	})
+	//cpvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	//	AddFunc:    pc.addClusterPolicyViolation,
+	//	UpdateFunc: pc.updateClusterPolicyViolation,
+	//	DeleteFunc: pc.deleteClusterPolicyViolation,
+	//})
 
-	nspvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    pc.addNamespacedPolicyViolation,
-		UpdateFunc: pc.updateNamespacedPolicyViolation,
-		DeleteFunc: pc.deleteNamespacedPolicyViolation,
-	})
+	//nspvInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	//	AddFunc:    pc.addNamespacedPolicyViolation,
+	//	UpdateFunc: pc.updateNamespacedPolicyViolation,
+	//	DeleteFunc: pc.deleteNamespacedPolicyViolation,
+	//})
 
 	pc.pLister = pInformer.Lister()
-	pc.cpvLister = cpvInformer.Lister()
-	pc.nspvLister = nspvInformer.Lister()
+	//pc.cpvLister = cpvInformer.Lister()
+	//pc.nspvLister = nspvInformer.Lister()
 	pc.nsLister = namespaces.Lister()
 
 	pc.pListerSynced = pInformer.Informer().HasSynced
-	pc.cpvListerSynced = cpvInformer.Informer().HasSynced
-	pc.nspvListerSynced = nspvInformer.Informer().HasSynced
+	//pc.cpvListerSynced = cpvInformer.Informer().HasSynced
+	//pc.nspvListerSynced = nspvInformer.Informer().HasSynced
 	pc.nsListerSynced = namespaces.Informer().HasSynced
 
 	// resource manager

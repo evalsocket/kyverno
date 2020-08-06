@@ -4,9 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/nirmata/kyverno/pkg/openapi"
@@ -193,8 +197,6 @@ func main() {
 		policyCtrl, err := policy.NewPolicyController(pclient,
 			client,
 			pInformer.Kyverno().V1().ClusterPolicies(),
-			pInformer.Kyverno().V1().ClusterPolicyViolations(),
-			pInformer.Kyverno().V1().PolicyViolations(),
 			configData,
 			eventGenerator,
 			rWebhookWatcher,
@@ -347,6 +349,51 @@ func main() {
 		<-cleanUp
 		setupLog.Info("Kyverno shutdown successful")
 	}else{
-		//TDOD: Add logic
+		// TODO : Get All Report From scope
+		var lselector *v1.LabelSelector
+
+
+		if os.Getenv("JOB_TYPE") == "NAMESPACE" || os.Getenv("JOB_TYPE") == "HELM" {
+			ns := strings.Split(os.Getenv("ACTIONS"),",")
+			for _,v := range ns {
+				lselector = &v1.LabelSelector{
+					MatchLabels: map[string]string{
+						"nirmata.io/namespace" : v,
+						"nirmata.io/action" : os.Getenv("JOB_TYPE"),
+					},
+				}
+				policyReport, err := client.ListResource("PolicyReport",config.KubePolicyNamespace,lselector)
+				if err != nil {
+					if !apierrors.IsNotFound(err) {
+						os.Exit(1)
+					}
+				}
+				go func(policyReport *unstructured.UnstructuredList,ns,jobType string){
+					// Get ALL policies
+				}(policyReport,v,os.Getenv("JOB_TYPE"))
+			}
+		}
+		if os.Getenv("JOB_TYPE") == "CLUSTER" {
+			lselector = &v1.LabelSelector{
+				MatchLabels: map[string]string{
+					"nirmata.io/cluster" : "true",
+					"nirmata.io/action" : os.Getenv("JOB_TYPE"),
+				},
+			}
+			policyReports, err := client.ListResource("PolicyReport",config.KubePolicyNamespace,lselector)
+			if err != nil {
+				if !apierrors.IsNotFound(err){
+					os.Exit(1)
+				}
+			}
+			go func(policyReports *unstructured.UnstructuredList,jobType string){
+
+			}(policyReports,os.Getenv("JOB_TYPE"))
+		}
+
+
+		// TODO : Get All Policies From scope
+		// TODO : Get All Resources From scope
+
 	}
 }
