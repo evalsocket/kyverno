@@ -15,7 +15,7 @@ import (
 	"github.com/nirmata/kyverno/pkg/constant"
 	client "github.com/nirmata/kyverno/pkg/dclient"
 	"github.com/nirmata/kyverno/pkg/event"
-	"github.com/nirmata/kyverno/pkg/policyviolation"
+	//"github.com/nirmata/kyverno/pkg/policyviolation"
 	"github.com/nirmata/kyverno/pkg/webhookconfig"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -82,8 +82,6 @@ type PolicyController struct {
 	// helpers to validate against current loaded configuration
 	configHandler config.Interface
 
-	// policy violation generator
-	pvGenerator policyviolation.GeneratorInterface
 
 	// resourceWebhookWatcher queues the webhook creation request, creates the webhook
 	resourceWebhookWatcher *webhookconfig.ResourceWebhookRegister
@@ -98,7 +96,6 @@ func NewPolicyController(kyvernoClient *kyvernoclient.Clientset,
 	cpvInformer kyvernoinformer.ClusterPolicyViolationInformer,
 	nspvInformer kyvernoinformer.PolicyViolationInformer,
 	configHandler config.Interface, eventGen event.Interface,
-	pvGenerator policyviolation.GeneratorInterface,
 	resourceWebhookWatcher *webhookconfig.ResourceWebhookRegister,
 	namespaces informers.NamespaceInformer,
 	log logr.Logger) (*PolicyController, error) {
@@ -119,7 +116,6 @@ func NewPolicyController(kyvernoClient *kyvernoclient.Clientset,
 		eventRecorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "policy_controller"}),
 		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "policy"),
 		configHandler:          configHandler,
-		pvGenerator:            pvGenerator,
 		resourceWebhookWatcher: resourceWebhookWatcher,
 		log:                    log,
 	}

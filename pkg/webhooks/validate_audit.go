@@ -56,7 +56,6 @@ type auditHandler struct {
 func NewValidateAuditHandler(pCache policycache.Interface,
 	eventGen event.Interface,
 	statusListener policystatus.Listener,
-	pvGenerator policyviolation.GeneratorInterface,
 	rbInformer rbacinformer.RoleBindingInformer,
 	crbInformer rbacinformer.ClusterRoleBindingInformer,
 	log logr.Logger) AuditHandler {
@@ -66,7 +65,6 @@ func NewValidateAuditHandler(pCache policycache.Interface,
 		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), workQueueName),
 		eventGen:       eventGen,
 		statusListener: statusListener,
-		pvGenerator:    pvGenerator,
 		rbLister:       rbInformer.Lister(),
 		rbSynced:       rbInformer.Informer().HasSynced,
 		crbLister:      crbInformer.Lister(),
@@ -161,7 +159,7 @@ func (h *auditHandler) process(request *v1beta1.AdmissionRequest) error {
 		return errors.Wrap(err, "failed to load service account in context")
 	}
 
-	HandleValidation(request, policies, nil, ctx, userRequestInfo, h.statusListener, h.eventGen, h.pvGenerator, logger)
+	HandleValidation(request, policies, nil, ctx, userRequestInfo, h.statusListener, h.eventGen, logger)
 	return nil
 }
 

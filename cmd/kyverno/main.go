@@ -22,7 +22,7 @@ import (
 	generatecleanup "github.com/nirmata/kyverno/pkg/generate/cleanup"
 	"github.com/nirmata/kyverno/pkg/policy"
 	"github.com/nirmata/kyverno/pkg/policystatus"
-	"github.com/nirmata/kyverno/pkg/policyviolation"
+	//"github.com/nirmata/kyverno/pkg/policyviolation"
 	"github.com/nirmata/kyverno/pkg/signal"
 	"github.com/nirmata/kyverno/pkg/utils"
 	"github.com/nirmata/kyverno/pkg/version"
@@ -197,7 +197,6 @@ func main() {
 			pInformer.Kyverno().V1().PolicyViolations(),
 			configData,
 			eventGenerator,
-			pvgen,
 			rWebhookWatcher,
 			kubeInformer.Core().V1().Namespaces(),
 			log.Log.WithName("PolicyController"),
@@ -244,7 +243,6 @@ func main() {
 			pCacheController.Cache,
 			eventGenerator,
 			statusSync.Listener,
-			pvgen,
 			kubeInformer.Rbac().V1().RoleBindings(),
 			kubeInformer.Rbac().V1().ClusterRoleBindings(),
 			log.Log.WithName("ValidateAuditHandler"),
@@ -298,7 +296,6 @@ func main() {
 			webhookRegistrationClient,
 			statusSync.Listener,
 			configData,
-			pvgen,
 			grgen,
 			rWebhookWatcher,
 			auditHandler,
@@ -321,7 +318,7 @@ func main() {
 		go eventGenerator.Run(1, stopCh)
 		go grc.Run(1, stopCh)
 		go grcc.Run(1, stopCh)
-		go pvgen.Run(1, stopCh)
+		//go pvgen.Run(1, stopCh)
 		go statusSync.Run(1, stopCh)
 		go pCacheController.Run(1, stopCh)
 		go auditHandler.Run(10, stopCh)

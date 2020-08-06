@@ -11,7 +11,6 @@ import (
 	"github.com/nirmata/kyverno/pkg/engine/context"
 	"github.com/nirmata/kyverno/pkg/engine/response"
 	engineutils "github.com/nirmata/kyverno/pkg/engine/utils"
-	"github.com/nirmata/kyverno/pkg/policyviolation"
 	v1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -86,8 +85,8 @@ func (ws *WebhookServer) HandleMutation(
 
 	// AUDIT
 	// generate violation when response fails
-	pvInfos := policyviolation.GeneratePVsFromEngineResponse(engineResponses, logger)
-	ws.pvGenerator.Add(pvInfos...)
+	//pvInfos := policyviolation.GeneratePVsFromEngineResponse(engineResponses, logger)
+	//ws.pvGenerator.Add(pvInfos...)
 
 	// REPORTING EVENTS
 	// Scenario 1:

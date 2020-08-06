@@ -6,7 +6,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func BuildKyvernoJob(namespace,scope string) *batchv1.Job {
+func BuildKyvernoJob(namespace string,envs map[string]string) *batchv1.Job {
+	var envVar []corev1.EnvVar
+	for k,v := range envs {
+		envVar = append(envVar,corev1.EnvVar{
+			Name : k,
+			Value : v,
+		})
+	}
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "random-name",
@@ -29,6 +36,7 @@ func BuildKyvernoJob(namespace,scope string) *batchv1.Job {
 							Args: []string{
 								"--scan: true",
 							},
+							Env: envVar,
 						},
 					},
 				},

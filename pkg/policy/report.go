@@ -6,24 +6,23 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/nirmata/kyverno/pkg/engine/response"
 	"github.com/nirmata/kyverno/pkg/event"
-	"github.com/nirmata/kyverno/pkg/policyviolation"
 )
 
 // for each policy-resource response
 // - has violation -> report
 // - no violation -> cleanup policy violations
 func (pc *PolicyController) cleanupAndReport(engineResponses []response.EngineResponse) {
-	logger := pc.log
+	//logger := pc.log
 	// generate Events
 	eventInfos := generateEvents(pc.log, engineResponses)
 	pc.eventGen.Add(eventInfos...)
 	// create policy violation
-	pvInfos := policyviolation.GeneratePVsFromEngineResponse(engineResponses, logger)
-	for i := range pvInfos {
-		pvInfos[i].FromSync = true
-	}
+	//pvInfos := policyviolation.GeneratePVsFromEngineResponse(engineResponses, logger)
+	//for i := range pvInfos {
+	//	pvInfos[i].FromSync = true
+	//}
 
-	pc.pvGenerator.Add(pvInfos...)
+	//pc.pvGenerator.Add(pvInfos...)
 	// cleanup existing violations if any
 	// if there is any error in clean up, we dont re-queue the resource
 	// it will be re-tried in the next controller cache resync
