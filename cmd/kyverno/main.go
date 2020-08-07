@@ -368,6 +368,7 @@ func main() {
 						os.Exit(1)
 					}
 				}
+				//
 				go func(policyReport *unstructured.UnstructuredList,ns,jobType string){
 					// Get ALL policies
 				}(policyReport,v,os.Getenv("JOB_TYPE"))
