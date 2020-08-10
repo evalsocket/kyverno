@@ -31,11 +31,10 @@ jobs:
           username: ${{ secrets.DOCKERIO_USERNAME }}
           password: ${{ secrets.DOCKERIO_PASSWORD }}
           repository: "evalsocket/kyverno"
-          tag_with_sha: true
           push: true
           path: cmd/kyverno/
           dockerfile: cmd/kyverno/Dockerfile
-          tags: ${{ steps.tag.outputs.result }}
+          tags: ${{ steps.get_version.outputs.VERSION }}
 
       -
         uses: docker/build-push-action@v1
@@ -44,11 +43,10 @@ jobs:
           username: ${{ secrets.DOCKERIO_USERNAME }}
           password: ${{ secrets.DOCKERIO_PASSWORD }}
           repository: "evalsocket/kyvernopre"
-          tag_with_sha: true
           push: true
           path: cmd/initContainer/
           dockerfile: cmd/initContainer/Dockerfile
-          tags: ${{ steps.tag.outputs.result }}
+          tags: ${{ steps.get_version.outputs.VERSION }}
 
       - uses: creekorful/goreportcard-action@v1.0
       -
