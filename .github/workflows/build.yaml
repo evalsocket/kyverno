@@ -27,8 +27,6 @@ jobs:
       -
         uses: docker/build-push-action@v1
         name: kyverno docker build and publish
-        env:
-          SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
         with:
           username: ${{ secrets.DOCKERIO_USERNAME }}
           password: ${{ secrets.DOCKERIO_PASSWORD }}
@@ -36,13 +34,11 @@ jobs:
           push: true
           path: cmd/kyverno/
           dockerfile: cmd/kyverno/Dockerfile
-          tags: $SOURCE_TAG
+          tags: ${{ github.event.release.tag_name }}
 
       -
         uses: docker/build-push-action@v1
         name: kyvernopre docker build and publish
-        env:
-          SOURCE_TAG: ${{ steps.branch_name.outputs.SOURCE_TAG }}
         with:
           username: ${{ secrets.DOCKERIO_USERNAME }}
           password: ${{ secrets.DOCKERIO_PASSWORD }}
@@ -50,7 +46,7 @@ jobs:
           push: true
           path: cmd/initContainer/
           dockerfile: cmd/initContainer/Dockerfile
-          tags: $SOURCE_TAG
+          tags: ${{ github.event.release.tag_name }}
 
       - uses: creekorful/goreportcard-action@v1.0
       -
