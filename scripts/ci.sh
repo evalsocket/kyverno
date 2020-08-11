@@ -11,8 +11,8 @@ chmod a+x $pwd/kind
 
 ## Create Kind Cluster
 $pwd/kind create cluster
-$pwd/kind load docker-image nirmata/kyverno:$hash
-$pwd/kind load docker-image nirmata/kyvernopre:$hash
+$pwd/kind load docker-image evalsocket/kyverno:$hash
+$pwd/kind load docker-image evalsocket/kyvernopre:$hash
 
 pwd=$(pwd)
 cd $pwd/definitions
