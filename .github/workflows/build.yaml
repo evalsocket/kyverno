@@ -34,7 +34,7 @@ jobs:
           chmod a+x ${GITHUB_WORKSPACE}/scripts/verify-deployment.sh
           sleep 50
           echo ">>> Check kyverno"
-          kubectl get pods -n kyverno
+          kubectl get pods -n kyverno -oyaml
           ${GITHUB_WORKSPACE}/scripts/verify-deployment.sh -n kyverno  kyverno
           echo ">>> Run Kyverno e2e test"
           make test-e2e
