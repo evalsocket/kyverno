@@ -26,10 +26,13 @@ import (
 )
 
 // ClusterPolicyViolationLister helps list ClusterPolicyViolations.
+// All objects returned here must be treated as read-only.
 type ClusterPolicyViolationLister interface {
 	// List lists all ClusterPolicyViolations in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClusterPolicyViolation, err error)
 	// Get retrieves the ClusterPolicyViolation from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClusterPolicyViolation, error)
 	ClusterPolicyViolationListerExpansion
 }
