@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - '*'
+    branches:
+      - 'fix-gorelease'
 
 jobs:
   docker-and-e2e:
