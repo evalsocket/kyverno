@@ -2,10 +2,10 @@ name: build
 on:
   push:
     branches:
-      - 'main'
+      - 'fix-1278'
   pull_request:
     branches:
-      - 'main'
+      - 'fix-1278'
 
 jobs:
   releaser:
