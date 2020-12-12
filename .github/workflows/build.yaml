@@ -34,6 +34,7 @@ jobs:
       - name: e2e testing
         run: |
           echo ">>> Install Kyverno"
+          cat ${GITHUB_WORKSPACE}/definitions/install.yaml
           kubectl apply -f ${GITHUB_WORKSPACE}/definitions/install.yaml
           kubectl apply -f ${GITHUB_WORKSPACE}/definitions/github/rbac.yaml
           chmod a+x ${GITHUB_WORKSPACE}/scripts/verify-deployment.sh
